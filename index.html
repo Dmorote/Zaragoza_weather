@@ -1,0 +1,738 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Zaragoza – Clima AEMET Isométrico</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI",
+        sans-serif;
+      min-height: 100vh;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      padding: 24px;
+      background: radial-gradient(circle at top, #d9e8ff 0, #f5f7ff 40%, #e9ecff 100%);
+      color: #1f2933;
+    }
+
+    .app-shell {
+      width: 100%;
+      max-width: 720px;
+      border-radius: 28px;
+      background: #ffffffee;
+      box-shadow:
+        0 22px 45px rgba(15, 23, 42, 0.15),
+        0 0 0 1px rgba(15, 23, 42, 0.04);
+      overflow: hidden;
+      display: grid;
+      grid-template-rows: minmax(260px, 1.2fr) auto auto;
+      backdrop-filter: blur(12px);
+    }
+
+    /* Zona imagen */
+    .visual-wrapper {
+      position: relative;
+      background: linear-gradient(135deg, #8ec5fc 0%, #e0c3fc 100%);
+      overflow: hidden;
+    }
+
+    .weather-image {
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      opacity: 0;
+      transform: scale(1.03);
+      transition:
+        opacity 1.4s ease-in-out,
+        transform 5s ease-out;
+    }
+
+    .weather-image.active {
+      opacity: 1;
+      transform: scale(1);
+    }
+
+    .visual-gradient-top {
+      position: absolute;
+      inset: 0;
+      background: linear-gradient(
+        to bottom,
+        rgba(255, 255, 255, 0.7),
+        rgba(255, 255, 255, 0.1) 40%,
+        rgba(255, 255, 255, 0)
+      );
+      z-index: 1;
+    }
+
+    .visual-gradient-bottom {
+      position: absolute;
+      inset: auto 0 0 0;
+      height: 40%;
+      background: linear-gradient(
+        to top,
+        rgba(255, 255, 255, 0.9),
+        rgba(255, 255, 255, 0.1)
+      );
+      z-index: 1;
+    }
+
+    /* Info principal */
+    .main-info {
+      position: relative;
+      z-index: 2;
+      padding: 20px 20px 10px;
+      text-align: center;
+    }
+
+    .city-row {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      margin-bottom: 4px;
+      color: #111827;
+      font-size: 0.9rem;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+    }
+
+    .city-dot {
+      width: 6px;
+      height: 6px;
+      border-radius: 999px;
+      background: #22c55e;
+      box-shadow: 0 0 0 4px rgba(34, 197, 94, 0.25);
+    }
+
+    .city-name {
+      font-size: 1rem;
+      font-weight: 800;
+    }
+
+    .date {
+      font-size: 0.85rem;
+      color: #111827;
+      margin-bottom: 16px;
+    }
+
+    .temp-row {
+      display: flex;
+      align-items: flex-start;
+      justify-content: center;
+      gap: 12px;
+      margin-bottom: 6px;
+    }
+
+    .weather-icon {
+      font-size: 2.4rem;
+      filter: drop-shadow(0 4px 10px rgba(15, 23, 42, 0.28));
+    }
+
+    .temp-value {
+      font-size: 3.2rem;
+      font-weight: 700;
+      letter-spacing: -0.04em;
+      line-height: 1;
+      color: #111827;
+    }
+
+    .description {
+      font-size: 0.95rem;
+      color: #111827;
+      text-transform: capitalize;
+      margin-bottom: 12px;
+    }
+
+    .refresh-btn {
+      margin-top: 4px;
+      padding: 6px 14px;
+      border-radius: 999px;
+      border: 1px solid rgba(148, 163, 184, 0.8);
+      background: #f9fafb;
+      color: #111827;
+      font-size: 0.8rem;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      transition:
+        background 0.15s ease,
+        transform 0.08s ease,
+        box-shadow 0.15s ease;
+      box-shadow: 0 1px 3px rgba(15, 23, 42, 0.12);
+    }
+
+    .refresh-btn:hover {
+      background: #e5e7eb;
+    }
+
+    .refresh-btn:active {
+      transform: scale(0.97);
+      box-shadow: 0 0 0 rgba(0, 0, 0, 0);
+    }
+
+    /* Bloque detalles */
+    .details-row {
+      padding: 14px 20px 10px;
+      border-top: 1px solid rgba(229, 231, 235, 0.9);
+      display: flex;
+      justify-content: space-between;
+      gap: 12px;
+      flex-wrap: wrap;
+      background: #f9fafb;
+    }
+
+    .detail-item {
+      flex: 1 1 30%;
+      min-width: 100px;
+    }
+
+    .detail-label {
+      font-size: 0.7rem;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      color: #9ca3af;
+      margin-bottom: 2px;
+    }
+
+    .detail-value {
+      font-size: 0.95rem;
+      font-weight: 600;
+      color: #111827;
+    }
+
+    /* Forecast */
+    .forecast-strip {
+      padding: 10px 14px 14px;
+      background: #f3f4f6;
+      border-top: 1px solid rgba(229, 231, 235, 0.9);
+      display: flex;
+      gap: 8px;
+      overflow-x: auto;
+      scrollbar-width: thin;
+    }
+
+    .forecast-strip::-webkit-scrollbar {
+      height: 5px;
+    }
+    .forecast-strip::-webkit-scrollbar-track {
+      background: transparent;
+    }
+    .forecast-strip::-webkit-scrollbar-thumb {
+      background: rgba(148, 163, 184, 0.6);
+      border-radius: 999px;
+    }
+
+    .forecast-card {
+      flex: 0 0 auto;
+      min-width: 78px;
+      border-radius: 14px;
+      background: #ffffff;
+      border: 1px solid rgba(209, 213, 219, 0.9);
+      padding: 7px 9px;
+      text-align: center;
+      box-shadow: 0 2px 5px rgba(15, 23, 42, 0.12);
+      font-size: 0.75rem;
+      color: #374151;
+    }
+
+    .forecast-card-day {
+      font-weight: 600;
+      margin-bottom: 2px;
+      font-size: 0.75rem;
+      text-transform: capitalize;
+    }
+
+    .forecast-card-icon {
+      font-size: 1.6rem;
+      margin: 3px 0;
+    }
+
+    .forecast-card-temp {
+      font-size: 0.78rem;
+      color: #4b5563;
+    }
+
+    /* Loading y estado */
+    .loading {
+      position: absolute;
+      inset: 0;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      z-index: 3;
+      gap: 10px;
+      font-size: 0.95rem;
+      color: #4b5563;
+      backdrop-filter: blur(6px);
+      background: linear-gradient(
+        to bottom,
+        rgba(249, 250, 251, 0.9),
+        rgba(249, 250, 251, 0.6)
+      );
+    }
+
+    .spinner {
+      border: 3px solid rgba(148, 163, 184, 0.4);
+      border-top: 3px solid #4f46e5;
+      border-radius: 50%;
+      width: 34px;
+      height: 34px;
+      animation: spin 0.9s linear infinite;
+    }
+
+    .update-time {
+      font-size: 0.75rem;
+      color: #9ca3af;
+      text-align: right;
+      padding: 0 18px 8px;
+    }
+
+    @keyframes spin {
+      0% { transform: rotate(0deg); }
+      100% { transform: rotate(360deg); }
+    }
+
+    @media (max-width: 600px) {
+      .app-shell {
+        border-radius: 18px;
+      }
+      .temp-value {
+        font-size: 2.6rem;
+      }
+      .weather-icon {
+        font-size: 2.1rem;
+      }
+      .details-row {
+        padding-inline: 14px;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="app-shell">
+    <div class="visual-wrapper">
+      <!-- Imágenes por tipo de tiempo -->
+      <img id="clearImg" class="weather-image" src="" alt="Zaragoza despejado">
+      <img id="cloudsImg" class="weather-image" src="" alt="Zaragoza nublado">
+      <img id="rainImg" class="weather-image" src="" alt="Zaragoza lluvia">
+      <img id="snowImg" class="weather-image" src="" alt="Zaragoza nieve">
+      <img id="stormImg" class="weather-image" src="" alt="Zaragoza tormenta">
+      <img id="mistImg" class="weather-image" src="" alt="Zaragoza niebla">
+
+      <div class="visual-gradient-top"></div>
+      <div class="visual-gradient-bottom"></div>
+
+      <div class="loading" id="loading">
+        <div class="spinner"></div>
+        <div>Cargando datos de AEMET...</div>
+      </div>
+
+      <div class="main-info" id="weatherInfo" style="display: none;">
+        <div class="city-row">
+          <span class="city-dot"></span>
+          <span class="city-name">Zaragoza, ES</span>
+        </div>
+        <div class="date" id="date"></div>
+
+        <div class="temp-row">
+          <div class="weather-icon" id="weatherIcon">☀️</div>
+          <div class="temp-value" id="temperature">--°</div>
+        </div>
+
+        <div class="description" id="description">Sin datos</div>
+
+        <button id="refreshBtn" class="refresh-btn">
+          <span>Actualizar</span>
+        </button>
+      </div>
+    </div>
+
+    <div class="details-row" id="weatherDetails" style="display: none;">
+      <div class="detail-item">
+        <div class="detail-label">T. Máx / Mín</div>
+        <div class="detail-value" id="tmaxTmin">-- / -- °C</div>
+      </div>
+      <div class="detail-item">
+        <div class="detail-label">Precipitación</div>
+        <div class="detail-value" id="probPrec">-- %</div>
+      </div>
+      <div class="detail-item">
+        <div class="detail-label">Fuente</div>
+        <div class="detail-value">AEMET · Predicción diaria</div>
+      </div>
+    </div>
+
+    <div class="forecast-strip" id="forecastStrip" style="display: none;"></div>
+
+    <div class="update-time" id="updateTime"></div>
+  </div>
+
+  <script>
+    // ========== CONSTANTES ==========
+    const AEMET_API_KEY =
+      'eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiJkbW9yb3RlOThAZ21haWwuY29tIiwianRpIjoiMDNlYTI1ZjUtM2Y3Ny00MGQxLTllOTktZGM2YTA4YmY5MDIzIiwiaXNzIjoiQUVNRVQiLCJpYXQiOjE3NjQ4MDUwNDIsInVzZXJJZCI6IjAzZWEyNWY1LTNmNzctNDBkMS05ZTk5LWRjNmEwOGJmOTAyMyIsInJvbGUiOiIifQ.MMXlU3SwTZILWINmDxF1kTsg31rcVTJ7YM4Tb7SgZ6A';
+    const ZARAGOZA_ID = '50297';
+    const CACHE_KEY = 'aemet_zaragoza_cache';
+    const CACHE_DURATION_MIN = 30;
+    const FETCH_TIMEOUT = 8000;
+
+    const weatherImages = {
+      clear: 'https://cdn.abacus.ai/images/24270676-096a-4e81-be3e-22dc0fba161f.png',
+      clouds: 'https://cdn.abacus.ai/images/f007b259-9956-4b32-bafc-dc4113f2b46b.png',
+      rain: 'https://cdn.abacus.ai/images/bb88b134-7c9b-430b-89df-ab490f5b66d9.png',
+      snow: 'https://cdn.abacus.ai/images/631f67de-d485-4a43-98bf-9970e4ae9419.png',
+      storm: 'https://cdn.abacus.ai/images/65d47a4c-d09b-4668-8bfa-61d8e821a2c1.png',
+      mist: 'https://cdn.abacus.ai/images/f3e11eae-526e-483e-a84f-a91fc07c10bf.png'
+    };
+
+    const weatherIcons = {
+      clear: '☀️',
+      clouds: '☁️',
+      rain: '🌧️',
+      snow: '❄️',
+      storm: '⛈️',
+      mist: '🌫️'
+    };
+
+    // ========== CARGAR IMÁGENES ==========
+    document.getElementById('clearImg').src = weatherImages.clear;
+    document.getElementById('cloudsImg').src = weatherImages.clouds;
+    document.getElementById('rainImg').src = weatherImages.rain;
+    document.getElementById('snowImg').src = weatherImages.snow;
+    document.getElementById('stormImg').src = weatherImages.storm;
+    document.getElementById('mistImg').src = weatherImages.mist;
+
+    // ========== CACHE ==========
+    function getCachedData() {
+      const saved = localStorage.getItem(CACHE_KEY);
+      if (!saved) return null;
+      try {
+        return JSON.parse(saved);
+      } catch {
+        return null;
+      }
+    }
+
+    function setCachedData(data) {
+      localStorage.setItem(CACHE_KEY, JSON.stringify(data));
+    }
+
+    function isCacheValid() {
+      const data = getCachedData();
+      if (!data || !data.timestamp) return false;
+      const diffMin = (Date.now() - data.timestamp) / 1000 / 60;
+      return diffMin < CACHE_DURATION_MIN;
+    }
+
+    // ========== MAPEO CÓDIGOS AEMET ==========
+    function mapEstadoCielo(codigo) {
+      const base = codigo.replace('n', '');
+      const despejado = ['11'];
+      const pocoNuboso = ['12', '13'];
+      const nuboso = ['14', '15', '16'];
+      const lluvia = ['17', '23', '24', '25'];
+      const nieve = ['26', '27'];
+      const tormenta = ['28', '29'];
+      const niebla = ['30', '31'];
+
+      if (despejado.includes(base)) return 'clear';
+      if (pocoNuboso.includes(base)) return 'clear';
+      if (nuboso.includes(base)) return 'clouds';
+      if (lluvia.includes(base)) return 'rain';
+      if (nieve.includes(base)) return 'snow';
+      if (tormenta.includes(base)) return 'storm';
+      if (niebla.includes(base)) return 'mist';
+      return 'clouds';
+    }
+
+    // ========== FETCH CON TIMEOUT ==========
+    async function fetchWithTimeout(resource, options = {}) {
+      const { timeout = FETCH_TIMEOUT } = options;
+      const controller = new AbortController();
+      const id = setTimeout(() => controller.abort(), timeout);
+
+      try {
+        const response = await fetch(resource, {
+          ...options,
+          signal: controller.signal
+        });
+        return response;
+      } finally {
+        clearTimeout(id);
+      }
+    }
+
+    // ========== UI ==========
+    function actualizarUI(data) {
+      const categoria = mapEstadoCielo(data.codigoEstado);
+
+      // Imágenes
+      document.querySelectorAll('.weather-image').forEach(img => {
+        img.classList.remove('active');
+      });
+
+      let imageId = 'cloudsImg';
+      if (categoria === 'clear') imageId = 'clearImg';
+      else if (categoria === 'clouds') imageId = 'cloudsImg';
+      else if (categoria === 'rain') imageId = 'rainImg';
+      else if (categoria === 'snow') imageId = 'snowImg';
+      else if (categoria === 'storm') imageId = 'stormImg';
+      else if (categoria === 'mist') imageId = 'mistImg';
+
+      document.getElementById(imageId).classList.add('active');
+
+      // Texto principal
+      const tempEl = document.getElementById('temperature');
+      tempEl.textContent = data.temp !== '--' ? `${data.temp}°` : '--°';
+
+      document.getElementById('description').textContent =
+        (data.descripcion || 'Sin datos').toLowerCase();
+      document.getElementById('weatherIcon').textContent =
+        weatherIcons[categoria] || '🌤️';
+
+      // Fecha
+      const now = new Date();
+      const options = {
+        weekday: 'long',
+        year: 'numeric',
+        month: 'long',
+        day: 'numeric'
+      };
+      document.getElementById('date').textContent = now.toLocaleDateString(
+        'es-ES',
+        options
+      );
+
+      // Detalles
+      document.getElementById('tmaxTmin').textContent =
+        `${data.tMax || '--'} / ${data.tMin || '--'} °C`;
+      document.getElementById('probPrec').textContent =
+        `${data.probPrec || '--'} %`;
+
+      const updatedAt = data.timestamp ? new Date(data.timestamp) : now;
+      document.getElementById('updateTime').textContent =
+        `Actualizado a las ${updatedAt.toLocaleTimeString('es-ES', {
+          hour: '2-digit',
+          minute: '2-digit'
+        })}`;
+
+      // Mostrar contenedores
+      document.getElementById('loading').style.display = 'none';
+      document.getElementById('weatherInfo').style.display = 'block';
+      document.getElementById('weatherDetails').style.display = 'flex';
+
+      if (data.forecast && data.forecast.length > 0) {
+        mostrarForecast(data.forecast);
+      }
+    }
+
+    function mostrarForecast(forecast) {
+      const stripEl = document.getElementById('forecastStrip');
+      stripEl.innerHTML = '';
+
+      forecast.slice(0, 4).forEach((dia, idx) => {
+        const card = document.createElement('div');
+        card.className = 'forecast-card';
+
+        const fecha = new Date();
+        fecha.setDate(fecha.getDate() + idx + 1);
+        const nombreDia = fecha.toLocaleDateString('es-ES', {
+          weekday: 'short'
+        });
+
+        const categoria = mapEstadoCielo(dia.codigoEstado);
+        const icono = weatherIcons[categoria] || '🌤️';
+
+        card.innerHTML = `
+          <div class="forecast-card-day">${nombreDia}</div>
+          <div class="forecast-card-icon">${icono}</div>
+          <div class="forecast-card-temp">${dia.tMax}° / ${dia.tMin}°</div>
+        `;
+
+        stripEl.appendChild(card);
+      });
+
+      stripEl.style.display = 'flex';
+    }
+
+    function cargarDesdeCache() {
+      const data = getCachedData();
+      if (!data) return false;
+      actualizarUI(data);
+      return true;
+    }
+
+    function mostrarError(mensaje) {
+      document.querySelectorAll('.weather-image').forEach(img =>
+        img.classList.remove('active')
+      );
+      document.getElementById('cloudsImg').classList.add('active');
+
+      document.getElementById('weatherInfo').style.display = 'block';
+      document.getElementById('weatherDetails').style.display = 'flex';
+
+      document.getElementById('temperature').textContent = '--°';
+      document.getElementById('description').textContent = 'Sin datos recientes';
+      document.getElementById('weatherIcon').textContent = '⚠️';
+      document.getElementById('tmaxTmin').textContent = '-- / -- °C';
+      document.getElementById('probPrec').textContent = '-- %';
+
+      const now = new Date();
+      const options = {
+        weekday: 'long',
+        year: 'numeric',
+        month: 'long',
+        day: 'numeric'
+      };
+      document.getElementById('date').textContent = now.toLocaleDateString(
+        'es-ES',
+        options
+      );
+
+      document.getElementById('loading').style.display = 'none';
+      document.getElementById('updateTime').textContent = mensaje;
+    }
+
+    // ========== AEMET ==========
+    async function getAemetPrediction() {
+      const loadingEl = document.getElementById('loading');
+      loadingEl.style.display = 'flex';
+      loadingEl.innerHTML =
+        '<div class="spinner"></div><div>Cargando datos de AEMET...</div>';
+
+      try {
+        const urlMeta = `https://opendata.aemet.es/opendata/api/prediccion/especifica/municipio/diaria/${ZARAGOZA_ID}/?api_key=${AEMET_API_KEY}`;
+
+        const metaResp = await fetchWithTimeout(urlMeta);
+        if (!metaResp.ok) throw new Error('Error HTTP en metadatos AEMET');
+
+        const metaJson = await metaResp.json();
+        if (!metaJson.datos)
+          throw new Error('Respuesta AEMET sin campo "datos"');
+
+        const dataResp = await fetchWithTimeout(metaJson.datos);
+        if (!dataResp.ok)
+          throw new Error('Error HTTP al descargar datos de predicción');
+
+        const prediccion = await dataResp.json();
+        const municipio = prediccion[0];
+        const dias = municipio.prediccion.dia;
+        const diaHoy = dias[0];
+
+        console.log('Día AEMET hoy:', diaHoy);
+
+        // Temperaturas
+        let tMax = '--';
+        let tMin = '--';
+        if (diaHoy.temperatura) {
+          if (typeof diaHoy.temperatura.maxima !== 'undefined') {
+            tMax = diaHoy.temperatura.maxima;
+          }
+          if (typeof diaHoy.temperatura.minima !== 'undefined') {
+            tMin = diaHoy.temperatura.minima;
+          }
+        }
+        const tempMedia =
+          tMax !== '--' && tMin !== '--'
+            ? Math.round((Number(tMax) + Number(tMin)) / 2)
+            : '--';
+
+        // Estado cielo
+        const estadoArray = (diaHoy.estadoCielo || []).filter(
+          e => e.value && e.value !== ''
+        );
+        const estado = estadoArray.length ? estadoArray[0] : null;
+        const descripcion = estado
+          ? estado.descripcion || 'Sin descripción'
+          : 'Sin datos';
+        const codigoEstado = estado ? estado.value : '11';
+
+        // Probabilidad precipitación
+        let probPrec = '--';
+        const probPrecipArray =
+          diaHoy.probPrecipitacion || diaHoy.probPrecipitación || [];
+        if (Array.isArray(probPrecipArray) && probPrecipArray.length > 0) {
+          const conValor = probPrecipArray.find(
+            p => p.value !== '' && p.value != null
+          );
+          if (conValor) probPrec = conValor.value;
+        }
+
+        // Forecast próximos días
+        const forecast = dias.slice(1, 5).map(dia => {
+          let dMax = '--';
+          let dMin = '--';
+          if (dia.temperatura) {
+            if (typeof dia.temperatura.maxima !== 'undefined')
+              dMax = dia.temperatura.maxima;
+            if (typeof dia.temperatura.minima !== 'undefined')
+              dMin = dia.temperatura.minima;
+          }
+
+          const estArr = (dia.estadoCielo || []).filter(
+            e => e.value && e.value !== ''
+          );
+          const est = estArr.length ? estArr[0] : null;
+
+          return {
+            tMax: dMax,
+            tMin: dMin,
+            codigoEstado: est ? est.value : '11'
+          };
+        });
+
+        const now = Date.now();
+        const cacheData = {
+          temp: tempMedia,
+          tMax,
+          tMin,
+          probPrec,
+          descripcion,
+          codigoEstado,
+          forecast,
+          timestamp: now
+        };
+
+        setCachedData(cacheData);
+        actualizarUI(cacheData);
+      } catch (err) {
+        console.error(err);
+
+        if (!cargarDesdeCache()) {
+          mostrarError('No se ha podido conectar con AEMET');
+        } else {
+          document.getElementById('loading').style.display = 'none';
+        }
+      }
+    }
+
+    // ========== EVENTOS ==========
+    document.getElementById('refreshBtn').addEventListener('click', () => {
+      getAemetPrediction();
+    });
+
+    (function init() {
+      const tieneCache = cargarDesdeCache();
+      if (!isCacheValid()) {
+        getAemetPrediction();
+      } else {
+        document.getElementById('loading').style.display = 'none';
+      }
+    })();
+
+    setInterval(getAemetPrediction, CACHE_DURATION_MIN * 60 * 1000);
+  </script>
+</body>
+</html>
